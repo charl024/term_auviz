@@ -11,7 +11,7 @@ typedef struct {
 } pipewire_capture_t;
 
 pipewire_capture_t* pipewire_capture_create();
-void pipewire_capture_destroy();
+void pipewire_capture_destroy(pipewire_capture_t* capture);
 
 
 #endif
