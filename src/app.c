@@ -1,0 +1,58 @@
+#include <notcurses/notcurses.h>
+#include "app.h"
+#include "graphics.h"
+#include "input.h"
+#include "state.h"
+#include "time_helper.h"
+#include "visualizer.h"
+
+int app_run()
+{
+    // init notcurses
+    struct notcurses_options opts = {0};
+    struct notcurses *nc = notcurses_init(&opts, NULL);
+    
+    if (!nc) return 1;
+
+    // set state to running
+    app_state_t state = {
+        .running = 1,
+
+        .x_pos = 5,
+        .y_pos = 5,
+        .x_vel = 60.0,
+        .y_vel = 60.0
+    };
+
+    graphics_init(nc, &state);
+
+    // time setup
+    struct timespec last, now;
+    clock_gettime(CLOCK_MONOTONIC, &last);
+
+    while (state.running) {
+        input_poll(nc, &state);
+
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long elapsed_ns = diff_ns(&now, &last);
+
+        if (elapsed_ns >= FRAME_TIME_NS) {
+            update_visual_state(&state, elapsed_ns);
+            graphics_draw(nc, &state);
+            notcurses_render(nc);
+            last = now;
+        } else {
+            struct timespec sleep_time = {
+                .tv_sec = 0,
+                .tv_nsec = FRAME_TIME_NS - elapsed_ns,
+            };
+            nanosleep(&sleep_time, NULL);
+        }
+
+        
+    }
+
+    graphics_shutdown();
+    notcurses_stop(nc);
+    return 0;
+}
