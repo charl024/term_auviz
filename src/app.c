@@ -5,6 +5,8 @@
 #include "state.h"
 #include "time_helper.h"
 #include "visualizer.h"
+#include "pipewire_backend.h"
+#include "proj_defines.h"
 
 int app_run()
 {
@@ -24,6 +26,10 @@ int app_run()
         .y_vel = 60.0
     };
 
+    // initialize and launch pipewire thread
+    pipewire_capture_t *audio_cap = pipewire_capture_init();
+    float *audio_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
+
     graphics_init(nc, &state);
 
     // time setup
@@ -37,6 +43,13 @@ int app_run()
         long elapsed_ns = diff_ns(&now, &last);
 
         if (elapsed_ns >= FRAME_TIME_NS) {
+
+            int bytes_read = pipewire_capture_get_audio(audio_cap, audio_buffer, FFT_SIZE);
+
+            if (bytes_read > 0) {
+                
+            }
+
             update_visual_state(&state, elapsed_ns);
             graphics_draw(nc, &state);
             notcurses_render(nc);
@@ -54,5 +67,6 @@ int app_run()
 
     graphics_shutdown();
     notcurses_stop(nc);
+    free(audio_buffer);
     return 0;
 }
