@@ -8,10 +8,12 @@
 typedef struct {
 	struct pw_main_loop *loop;
 	struct pw_stream *stream;
+	ringbuffer_t *ringbuffer;
 } pipewire_capture_t;
 
 pipewire_capture_t* pipewire_capture_create();
 void pipewire_capture_destroy(pipewire_capture_t* capture);
+int pipewire_capture_get_audio(pipewire_capture_t* capture, float* buffer, size_t size);
 
 
 #endif
