@@ -37,26 +37,47 @@ void ringbuffer_destroy(ringbuffer_t* buffer)
         return;
     }
 
+    pthread_mutex_destroy(buffer->mutex);
     free(buffer->data);
     free(buffer);
 }
 
-void ringbuffer_read(ringbuffer_t* buffer, void* output_data, size_t output_size) 
+int ringbuffer_read(ringbuffer_t* buffer, float* output_data, size_t output_size) 
 {
-    size_t r, w;
     pthread_mutex_lock(buffer->mutex);
-    r = buffer->read_index;
-    w = buffer->write_index;
-    pthread_mutex_unlock(buffer->mutex);
+
+    size_t r = buffer->read_index;
+    size_t w = buffer->write_index;
 
     size_t available = w - r;
-    size_t max_n = available < output_size ? available : output_size;
+    size_t to_read = available < output_size ? available : output_size;
 
-    // TODO read buffer data into output
+    for (size_t i = 0; i < to_read; i++) {
+        output_data[i] = buffer->data[(r + i) % RINGBUFFER_SIZE];
+    }
 
+    buffer->read_index = r + to_read;
+
+    pthread_mutex_unlock(buffer->mutex);
+    return to_read;
 }
 
-void ringbuffer_write(ringbuffer_t* buffer, void* input_data, size_t input_size) 
+int ringbuffer_write(ringbuffer_t* buffer, float* input_data, size_t input_size)
 {
+    pthread_mutex_lock(buffer->mutex);
 
+    size_t w = buffer->write_index;
+    size_t r = buffer->read_index;
+    size_t available = RINGBUFFER_SIZE - (w - r);
+
+    size_t to_write = input_size < available ? input_size : available;
+
+    for (size_t i = 0; i < to_write; i++) {
+        buffer->data[(w + i) % RINGBUFFER_SIZE] = input_data[i];
+    }
+
+    buffer->write_index = w + to_write;
+
+    pthread_mutex_unlock(buffer->mutex);
+    return to_write;
 }
