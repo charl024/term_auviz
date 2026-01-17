@@ -8,9 +8,21 @@ pipewire_capture_t* pipewire_capture_init()
         return NULL;
     }
 
+	struct pw_properties* props = pw_properties_new(
+			PW_KEY_MEDIA_TYPE, "Audio",
+			PW_KEY_MEDIA_CATEGORY, "Capture",
+			PW_KEY_MEDIA_ROLE, "Music",
+			NULL);
+
     // initialize the capture object
     capture->loop = pw_main_loop_new(NULL);
-    capture->stream = pw_stream_new(capture->loop, "Audio", NULL);
+    capture->stream = pw_stream_new_simple(
+			pw_main_loop_get_loop(capture->loop),
+			"native-audio_capture", 
+			props,
+			&stream_events,
+			&capture);
+	
     capture->ringbuffer = ringbuffer_create(FFT_SIZE);
 
 
