@@ -30,6 +30,8 @@ int app_run()
     pipewire_capture_t *audio_cap = pipewire_capture_create();
     float *audio_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
 
+    pipewire_capture_run(audio_cap);
+
     graphics_init(nc, &state);
 
     // time setup

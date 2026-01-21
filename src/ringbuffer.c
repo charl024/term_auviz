@@ -40,6 +40,7 @@ void ringbuffer_destroy(ringbuffer_t* buffer)
     }
 
     pthread_mutex_destroy(buffer->mutex);
+    free(buffer->mutex);
     free(buffer->data);
     free(buffer);
 }

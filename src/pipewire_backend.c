@@ -51,12 +51,13 @@ pipewire_capture_t* pipewire_capture_create()
 			&stream_events,
 			capture);
 
-    pw_properties_free(props);
+    // pw_properties_free(props);
 
 	// initialize ringbuffer
     capture->ringbuffer = ringbuffer_create(FFT_SIZE);
 
-    struct spa_pod_builder builder = SPA_POD_BUILDER_INIT(capture->ringbuffer->data, capture->ringbuffer->size);
+    uint8_t param_buf[1024];
+    struct spa_pod_builder builder = SPA_POD_BUILDER_INIT(param_buf, sizeof(param_buf));
     const struct spa_pod *params[1];
 
     // parameter setup
@@ -96,9 +97,15 @@ void pipewire_capture_destroy(pipewire_capture_t* capture)
         pw_main_loop_quit(capture->loop);
     }
 
-    if (capture->thread_running) {
+    if (capture->thread_running && capture->cap_thread) {
+        pw_main_loop_quit(capture->loop);
         pthread_join(*capture->cap_thread, NULL);
         capture->thread_running = 0;
+    }
+
+    if (capture->cap_thread) {
+        free(capture->cap_thread);
+        capture->cap_thread = NULL;
     }
 
     if (capture->stream) {
