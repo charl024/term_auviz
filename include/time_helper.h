@@ -4,7 +4,7 @@
 #include <time.h>
 
 #define TARGET_FPS 60
-#define FRAME_TIME_NS (1000000000UL / TARGET_FPS)
+#define FRAME_TIME_NS (1000000000L / TARGET_FPS)
 
 static inline long
 timespec_to_ns(const struct timespec *ts)
