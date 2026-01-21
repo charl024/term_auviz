@@ -27,7 +27,7 @@ int app_run()
     };
 
     // initialize and launch pipewire thread
-    pipewire_capture_t *audio_cap = pipewire_capture_init();
+    pipewire_capture_t *audio_cap = pipewire_capture_create();
     float *audio_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
 
     graphics_init(nc, &state);
