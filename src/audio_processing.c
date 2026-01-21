@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include "audio_processing.h"
+
 
 audio_processing_t* audio_processing_create() 
 {
