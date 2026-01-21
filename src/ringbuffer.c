@@ -1,7 +1,7 @@
 #include "ringbuffer.h"
 #include <stdio.h>
 
-ringbuffer_t* ringbuffer_create() 
+ringbuffer_t* ringbuffer_create(size_t init_size) 
 {
     ringbuffer_t* buffer = (ringbuffer_t*)calloc(1, sizeof(ringbuffer_t));
 
@@ -20,7 +20,7 @@ ringbuffer_t* ringbuffer_create()
     buffer->mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(buffer->mutex, NULL);
     
-    buffer->size = RINGBUFFER_SIZE;
+    buffer->size = init_size;
     buffer->write_index = 0;
     buffer->read_index = 0;
 
