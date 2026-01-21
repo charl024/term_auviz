@@ -1,4 +1,5 @@
 #include "pipewire_backend.h"
+#include "pipewire/main-loop.h"
 #include "proj_defines.h"
 #include <pthread.h>
 
@@ -17,11 +18,14 @@ static void* pipewire_capture_launch_loop(void* data)
 {
     pipewire_capture_t* capture = (pipewire_capture_t*)data;
     pw_main_loop_run(capture->loop);
+
+    return NULL;
 }
 
 void pipewire_capture_run(pipewire_capture_t* capture) 
 {
     // create pthread that runs pw loop
+    capture->thread_running = 1;
     pthread_create(capture->cap_thread, NULL, pipewire_capture_launch_loop, (void*)capture);
 }
 
@@ -45,7 +49,10 @@ pipewire_capture_t* pipewire_capture_create()
 			"native-audio_capture", 
 			props,
 			&stream_events,
-			&capture);
+			capture);
+
+    pw_properties_free(props);
+
 	// initialize ringbuffer
     capture->ringbuffer = ringbuffer_create(FFT_SIZE);
 
@@ -74,18 +81,41 @@ pipewire_capture_t* pipewire_capture_create()
     
     // allocate thread
     capture->cap_thread = (pthread_t*)malloc(sizeof(pthread_t));
+    capture->thread_running = 0;
     
     // return the capture struct, do not start the pw loop
     return capture;
 }
 
-void pipewire_capture_destroy(pipewire_capture_t* capture) 
+
+void pipewire_capture_destroy(pipewire_capture_t* capture)
 {
     if (!capture) return;
 
-    pw_stream_destroy(capture->stream);
-    pw_main_loop_destroy(capture->loop);
-    ringbuffer_destroy(capture->ringbuffer);
+    if (capture->loop) {
+        pw_main_loop_quit(capture->loop);
+    }
+
+    if (capture->thread_running) {
+        pthread_join(*capture->cap_thread, NULL);
+        capture->thread_running = 0;
+    }
+
+    if (capture->stream) {
+        pw_stream_destroy(capture->stream);
+        capture->stream = NULL;
+    }
+
+    if (capture->loop) {
+        pw_main_loop_destroy(capture->loop);
+        capture->loop = NULL;
+    }
+
+    if (capture->ringbuffer) {
+        ringbuffer_destroy(capture->ringbuffer);
+        capture->ringbuffer = NULL;
+    }
+
     free(capture);
 }
 
