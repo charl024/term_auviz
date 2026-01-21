@@ -1,9 +1,9 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -O3
+CFLAGS = -Wall -Wextra -O3 
 PKG = $(shell pkg-config --cflags --libs notcurses libpipewire-0.3)
 
 SRC = src/*
-INC = -Iinclude -lm
+INC = -Iinclude -lm -lpthread
 
 TARGET = term_auviz
 
