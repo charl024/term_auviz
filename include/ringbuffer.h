@@ -14,7 +14,7 @@ typedef struct {
     pthread_mutex_t *mutex;
 } ringbuffer_t;
 
-ringbuffer_t* ringbuffer_create();
+ringbuffer_t* ringbuffer_create(size_t init_size);
 void ringbuffer_destroy(ringbuffer_t* buffer);
 int ringbuffer_read(ringbuffer_t* buffer, float* output_data, size_t output_size);
 int ringbuffer_write(ringbuffer_t* buffer, float* input_data, size_t input_size);
