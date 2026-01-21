@@ -67,6 +67,7 @@ int app_run()
 
     graphics_shutdown();
     notcurses_stop(nc);
+    pipewire_capture_destroy(audio_cap);
     free(audio_buffer);
     return 0;
 }
