@@ -14,10 +14,12 @@ void audio_processing_process(audio_processing_t* processor, float* data, size_t
 typedef struct {
     float* buffer;
     size_t current_fill;
+    size_t max_size;
 } accumulator_t;
 
 accumulator_t* accumulator_create(size_t buffer_size);
 void accumulator_destroy(accumulator_t* acc);
-void accumulator_add_sample(accumulator_t* acc, float* sample, size_t input_count, float* output_buffer, size_t output_size);
+int accumulator_accumulate(accumulator_t* acc, float* sample, size_t input_count);
+void accumulator_move_data_to_out(accumulator_t* acc, float* output_buffer, size_t output_size);
 
 #endif

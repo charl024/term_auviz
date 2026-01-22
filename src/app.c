@@ -7,6 +7,7 @@
 #include "visualizer.h"
 #include "pipewire_backend.h"
 #include "proj_defines.h"
+#include "audio_processing.h"
 
 int app_run()
 {
@@ -32,7 +33,14 @@ int app_run()
 
     pipewire_capture_run(audio_cap);
 
+    // initialize audio processing
+    audio_processing_t *audio_proc = audio_processing_create();
+    accumulator_t *acc = accumulator_create(FFT_SIZE);
+
+
     graphics_init(nc, &state);
+
+    float processed_buffer[FFT_SIZE];
 
     // time setup
     struct timespec last, now;
@@ -49,7 +57,11 @@ int app_run()
             int bytes_read = pipewire_capture_get_audio(audio_cap, audio_buffer, FFT_SIZE);
 
             if (bytes_read > 0) {
-                
+                int r = accumulator_accumulate(acc, audio_buffer, bytes_read);
+                if (r) {
+                    accumulator_move_data_to_out(acc, processed_buffer, FFT_SIZE);
+                    printf("data\n");
+                }
             }
 
             update_visual_state(&state, elapsed_ns);
@@ -70,6 +82,8 @@ int app_run()
     graphics_shutdown();
     notcurses_stop(nc);
     pipewire_capture_destroy(audio_cap);
+    audio_processing_destroy(audio_proc);
+    accumulator_destroy(acc);
     free(audio_buffer);
     return 0;
 }
