@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -O3
 PKG = $(shell pkg-config --cflags --libs notcurses libpipewire-0.3)
 
 SRC = src/*
-INC = -Iinclude -lm -lpthread
+INC = -Iinclude -lm -lpthread -lfftw3
 
 TARGET = term_auviz
 
