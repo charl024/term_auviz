@@ -5,7 +5,25 @@
 
 static void on_process(void *data) 
 {
+    pipewire_capture_t* capture = data;
 
+    struct pw_buffer *buf = pw_stream_dequeue_buffer(capture->stream);
+     
+    if (!buf) return;
+
+    struct spa_buffer *spa_buf = buf->buffer;
+    
+    if (spa_buf->datas[0].data == NULL) {
+        pw_stream_queue_buffer(capture->stream, buf);
+        return;
+    }
+    
+    float *samples = spa_buf->datas[0].data;
+    uint32_t n_samples = spa_buf->datas[0].chunk->size / sizeof(float);
+
+    ringbuffer_write(capture->ringbuffer, samples, n_samples);
+
+    pw_stream_queue_buffer(capture->stream, buf);
 }
     
 
@@ -74,7 +92,7 @@ pipewire_capture_t* pipewire_capture_create()
     pw_stream_connect(
         capture->stream,
         PW_DIRECTION_INPUT,
-        114,
+        81, // hardcoded for testing
         PW_STREAM_FLAG_AUTOCONNECT |
         PW_STREAM_FLAG_MAP_BUFFERS |
         PW_STREAM_FLAG_RT_PROCESS,
