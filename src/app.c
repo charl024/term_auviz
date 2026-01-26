@@ -12,10 +12,10 @@
 int app_run()
 {
     // init notcurses
-    struct notcurses_options opts = {0};
-    struct notcurses *nc = notcurses_init(&opts, NULL);
+    // struct notcurses_options opts = {0};
+    // struct notcurses *nc = notcurses_init(&opts, NULL);
     
-    if (!nc) return 1;
+    // if (!nc) return 1;
 
     // set state to running
     app_state_t state = {
@@ -29,44 +29,51 @@ int app_run()
 
     // initialize and launch pipewire thread
     pipewire_capture_t *audio_cap = pipewire_capture_create();
-    float *audio_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
+    float *input_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
+    float *output_buffer = (float*)malloc(sizeof(float) * FFT_SIZE);
 
     pipewire_capture_run(audio_cap);
 
     // initialize audio processing
-    audio_processing_t *audio_proc = audio_processing_create();
-    accumulator_t *acc = accumulator_create(FFT_SIZE);
+    audio_processing_t *audio_proc = audio_processing_create(FFT_SIZE);
 
-
-    graphics_init(nc, &state);
-
-    float processed_buffer[FFT_SIZE];
+    // graphics_init(nc, &state);
 
     // time setup
     struct timespec last, now;
     clock_gettime(CLOCK_MONOTONIC, &last);
 
     while (state.running) {
-        input_poll(nc, &state);
+        // input_poll(nc, &state);
 
         clock_gettime(CLOCK_MONOTONIC, &now);
         long elapsed_ns = diff_ns(&now, &last);
 
         if (elapsed_ns >= FRAME_TIME_NS) {
 
-            int bytes_read = pipewire_capture_get_audio(audio_cap, audio_buffer, FFT_SIZE);
+            int bytes_read = pipewire_capture_get_audio(audio_cap, input_buffer, FFT_SIZE);
 
-            if (bytes_read > 0) {
-                int r = accumulator_accumulate(acc, audio_buffer, bytes_read);
-                if (r) {
-                    accumulator_move_data_to_out(acc, processed_buffer, FFT_SIZE);
-                    printf("data\n");
+            if (bytes_read == FFT_SIZE) {
+                float sum = 0.0;
+                for (int i = 0; i < bytes_read; i++) {
+                    float p = input_buffer[i];
+                    sum += p;
                 }
+                printf("input_buffer sum: %f \t", sum);
+
+                audio_processing_process(audio_proc, input_buffer, output_buffer, bytes_read);
+
+                sum = 0.0;
+                for (int i = 0; i < bytes_read; i++) {
+                    float p = output_buffer[i];
+                    sum += p;
+                }
+                printf("output_buffer sum: %f\n", sum);
             }
 
-            update_visual_state(&state, elapsed_ns);
-            graphics_draw(nc, &state);
-            notcurses_render(nc);
+            // update_visual_state(&state, elapsed_ns);
+            // graphics_draw(nc, &state);
+            // notcurses_render(nc);
             last = now;
         } else {
             struct timespec sleep_time = {
@@ -75,15 +82,13 @@ int app_run()
             };
             nanosleep(&sleep_time, NULL);
         }
-
-        
     }
 
-    graphics_shutdown();
-    notcurses_stop(nc);
+    // graphics_shutdown();
+    // notcurses_stop(nc);
     pipewire_capture_destroy(audio_cap);
     audio_processing_destroy(audio_proc);
-    accumulator_destroy(acc);
-    free(audio_buffer);
+    free(input_buffer);
+    free(output_buffer);
     return 0;
 }
