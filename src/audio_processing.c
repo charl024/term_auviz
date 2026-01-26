@@ -1,84 +1,69 @@
 #include <stdio.h>
+#include <string.h>
+#include <math.h>
 #include "audio_processing.h"
 
 
-audio_processing_t* audio_processing_create() 
+audio_processing_t* audio_processing_create(size_t fft_size) 
 {
+    audio_processing_t* processor = (audio_processing_t*)malloc(sizeof(audio_processing_t));
+    if (!processor) {
+        fprintf(stderr, "Error allocating audio_processing_t.\n");
+        return NULL;
+    }
 
+    processor->input = (double *)malloc(sizeof(double) * fft_size);
+    processor->output = (double *)malloc(sizeof(double) * fft_size);
+    processor->complex_output = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * fft_size);
+    processor->plan = fftw_plan_dft_r2c_1d(fft_size, processor->input, processor->complex_output, 0);
+
+    return processor;
 }
 
 void audio_processing_destroy(audio_processing_t* processor) 
 {
+    if (!processor) {
+        fprintf(stderr, "audio_processing_t processor is uninitialized!\n");
+        return;
+    }
 
+    if (processor->input) {
+        free(processor->input);
+    }
+
+    if (processor->output) {
+        free(processor->output);
+    }
+
+    if (processor->complex_output) {
+        fftw_free(processor->complex_output);
+    }
+
+    if (processor->plan) {
+        fftw_destroy_plan(processor->plan);
+        fftw_cleanup();
+    }
+
+    free(processor);
 }
 
-void audio_processing_process(audio_processing_t* processor, float* data, size_t size) 
+void audio_processing_process(audio_processing_t* processor, float* input_data, float* output_data, size_t size) 
 {
-    if (!processor || !data || size == 0) {
+    if (!processor || !input_data || size == 0) {
         fprintf(stderr, "Invalid audio processing parameters.\n");
         return;
     }
 
     // Process the audio data
-}
+    memcpy(processor->input, input_data, sizeof(float) * size);
 
-accumulator_t* accumulator_create(size_t buffer_size) 
-{
-    accumulator_t* acc = (accumulator_t*)malloc(sizeof(accumulator_t));
-    if (!acc) {
-        fprintf(stderr, "Error allocating accumulator_t.\n");
-        return NULL;
+    fftw_execute_dft_r2c(processor->plan, processor->input, processor->complex_output);
+
+    for(size_t i = 0; i < size; i++) {
+        float a = processor->complex_output[i][0];
+        float b = processor->complex_output[i][1];
+        float mag = a*a + b*b;
+        output_data[i] = sqrt(mag); 
     }
-
-    acc->buffer = (float*)malloc(sizeof(float) * buffer_size);
-    if (!acc->buffer) {
-        fprintf(stderr, "Error allocating accumulator_t buffer.\n");
-        free(acc);
-        return NULL;
-    }
-
-    acc->current_fill = 0;
-    acc->max_size = buffer_size;
-    return acc;
-}
-
-void accumulator_destroy(accumulator_t* acc) 
-{
-    if (!acc) return;
-
-    free(acc->buffer);
-    free(acc);
-}
-
-int accumulator_accumulate(accumulator_t* acc, float* sample, size_t input_count) 
-{
-    if (!acc) return -1;
-
-    while (acc->current_fill < acc->max_size) {
-        for (size_t i = 0; i < input_count; i++) {
-            if (acc->current_fill < acc->max_size) {
-                acc->buffer[acc->current_fill] = sample[i];
-                acc->current_fill++;
-            } else {
-                return 1;
-            }
-        }
-    }
-
-    return 0;
-}
-
-void accumulator_move_data_to_out(accumulator_t* acc, float* output_buffer, size_t output_size) 
-{
-    if (!acc || !output_buffer || output_size == 0) return;
-
-    size_t to_copy = (acc->current_fill < output_size) ? acc->current_fill : output_size;
-    for (size_t i = 0; i < to_copy; i++) {
-        output_buffer[i] = acc->buffer[i];
-    }
-
-    for (size_t i = to_copy; i < acc->current_fill; i++) {
-        acc->buffer[i - to_copy] = acc->buffer[i];
-    }
-    acc->current_fill -= to_copy;
+    
 }
