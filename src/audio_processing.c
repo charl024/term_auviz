@@ -4,7 +4,7 @@
 #include "audio_processing.h"
 
 
-audio_processing_t* audio_processing_create(size_t fft_size) 
+audio_processing_t* audio_processing_create(size_t fft_size, size_t fft_out_size) 
 {
     audio_processing_t* processor = (audio_processing_t*)malloc(sizeof(audio_processing_t));
     if (!processor) {
@@ -13,8 +13,8 @@ audio_processing_t* audio_processing_create(size_t fft_size)
     }
 
     processor->input = (double *)malloc(sizeof(double) * fft_size);
-    processor->output = (double *)malloc(sizeof(double) * fft_size);
-    processor->complex_output = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * fft_size);
+    processor->output = (double *)malloc(sizeof(double) * fft_out_size);
+    processor->complex_output = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * fft_out_size);
     processor->plan = fftw_plan_dft_r2c_1d(fft_size, processor->input, processor->complex_output, 0);
 
     return processor;
@@ -47,23 +47,49 @@ void audio_processing_destroy(audio_processing_t* processor)
     free(processor);
 }
 
-void audio_processing_process(audio_processing_t* processor, float* input_data, float* output_data, size_t size) 
+static void fft_process(audio_processing_t* processor, size_t input_size, size_t fft_bins) 
 {
-    if (!processor || !input_data || size == 0) {
+    fftw_execute(processor->plan);
+
+    for (size_t i = 0; i < fft_bins; i++) {
+        double re = processor->complex_output[i][0];
+        double im = processor->complex_output[i][1];
+
+        double mag = sqrt(re * re + im * im);
+        mag /= (double)input_size;
+
+        double db = 20.0 * log10(mag + 1e-12);
+
+        processor->output[i] = db;
+    }
+}
+
+static void hanning_window(audio_processing_t* processor, size_t input_size) 
+{
+    double pi = 3.14159265359;
+    for (size_t i = 0; i < input_size; i++) {
+        double mult = 0.5 * (1 - cos((2*pi*i)/(input_size - 1)));
+        processor->input[i] = processor->input[i] * mult;
+    }
+}
+
+void audio_processing_process(audio_processing_t* processor, float* input_data, double* output_data, size_t input_size, size_t fft_bins) 
+{
+    if (!processor || !input_data) {
         fprintf(stderr, "Invalid audio processing parameters.\n");
         return;
     }
 
     // Process the audio data
-    memcpy(processor->input, input_data, sizeof(float) * size);
+    for (size_t i = 0; i < input_size; i++) {
+        processor->input[i] = (double)(input_data[i]);
+    }
 
-    fftw_execute_dft_r2c(processor->plan, processor->input, processor->complex_output);
+    hanning_window(processor, input_size);
+    fft_process(processor, input_size, fft_bins);
 
-    for(size_t i = 0; i < size; i++) {
-        float a = processor->complex_output[i][0];
-        float b = processor->complex_output[i][1];
-        float mag = a*a + b*b;
-        output_data[i] = sqrt(mag); 
+    for (size_t i = 0; i < fft_bins; i++) {
+        output_data[i] = processor->output[i];
     }
     
 }
