@@ -53,6 +53,12 @@ int ringbuffer_read(ringbuffer_t* buffer, float* output_data, size_t output_size
     size_t w = buffer->write_index;
 
     size_t available = w - r;
+
+    if (available < output_size) {
+        pthread_mutex_unlock(buffer->mutex);
+        return 0;
+    }
+
     size_t to_read = available < output_size ? available : output_size;
 
     for (size_t i = 0; i < to_read; i++) {

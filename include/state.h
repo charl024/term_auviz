@@ -18,6 +18,9 @@ typedef struct {
     double y_pos;
     double x_vel;
     double y_vel;
+
+    int buffer_size;
+    double* buffer_data;
     
 } app_state_t;
 

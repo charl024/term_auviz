@@ -19,9 +19,12 @@ static void on_process(void *data)
     }
     
     float *samples = spa_buf->datas[0].data;
-    uint32_t n_samples = spa_buf->datas[0].chunk->size / sizeof(float);
+    uint32_t frames = spa_buf->datas[0].chunk->size / (sizeof(float) * 2);
 
-    ringbuffer_write(capture->ringbuffer, samples, n_samples);
+    for (uint32_t i = 0; i < frames; i++) {
+        float mono = 0.5f * (samples[2*i] + samples[2*i + 1]);
+        ringbuffer_write(capture->ringbuffer, &mono, 1);
+    }
 
     pw_stream_queue_buffer(capture->stream, buf);
 }
@@ -60,6 +63,8 @@ pipewire_capture_t* pipewire_capture_create()
 			PW_KEY_MEDIA_ROLE, "Music",
 			NULL);
 
+    pw_properties_set(props, PW_KEY_STREAM_CAPTURE_SINK, "true");
+
     // initialize the capture object
     capture->loop = pw_main_loop_new(NULL);
     capture->stream = pw_stream_new_simple(
@@ -92,7 +97,7 @@ pipewire_capture_t* pipewire_capture_create()
     pw_stream_connect(
         capture->stream,
         PW_DIRECTION_INPUT,
-        81, // hardcoded for testing
+        PW_ID_ANY,
         PW_STREAM_FLAG_AUTOCONNECT |
         PW_STREAM_FLAG_MAP_BUFFERS |
         PW_STREAM_FLAG_RT_PROCESS,
