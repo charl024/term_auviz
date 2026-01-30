@@ -5,7 +5,7 @@
 #include "state.h"
 
 void graphics_init(struct notcurses *nc, app_state_t *state);
-void graphics_draw(struct notcurses *nc, app_state_t *state);
+void graphics_draw(struct notcurses *nc, app_state_t *state, size_t num_bins);
 void graphics_shutdown(void);
 
 
