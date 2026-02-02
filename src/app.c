@@ -40,7 +40,7 @@ int app_run()
     };
 
     // initialize audio processing
-    audio_processing_t *audio_proc = audio_processing_create(FFT_SIZE, FFT_BINS);
+    audio_processing_t *audio_processor = audio_processing_create(FFT_SIZE);
 
     graphics_init(nc, &state);
 
@@ -59,8 +59,7 @@ int app_run()
             int bytes_read = pipewire_capture_get_audio(audio_cap, input_buffer, FFT_SIZE);
 
             if (bytes_read == FFT_SIZE) {
-
-                audio_processing_process(audio_proc, input_buffer, output_buffer, bytes_read, FFT_BINS);
+                audio_processing_process(audio_processor, input_buffer, output_buffer);
             }
 
             update_visual_state(&state, elapsed_ns);
@@ -80,7 +79,7 @@ int app_run()
     graphics_shutdown();
     notcurses_stop(nc);
     pipewire_capture_destroy(audio_cap);
-    audio_processing_destroy(audio_proc);
+    audio_processing_destroy(audio_processor);
     free(input_buffer);
     free(output_buffer);
     return 0;
