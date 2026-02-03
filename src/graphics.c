@@ -6,15 +6,82 @@
 #include "graphics.h"
 
 #define MIN_EDGE 1
+#define DB_MIN   (-80.0)
+#define DB_MAX   (0.0)
+
+#define RGB_R(c) (((c) >> 16) & 0xFF)
+#define RGB_G(c) (((c) >>  8) & 0xFF)
+#define RGB_B(c) (((c) >>  0) & 0xFF)
+
+#define BG_COLOR  0x232136
+#define BAR_COLOR 0xebbcba
 
 static struct ncplane *root;
 static struct ncplane *main_win;
 
+static uint64_t bg_channels = NCCHANNELS_INITIALIZER(
+    0, 0, 0,
+    RGB_R(BG_COLOR),
+    RGB_G(BG_COLOR),
+    RGB_B(BG_COLOR)
+);
+
+static uint64_t bar_channels = NCCHANNELS_INITIALIZER(
+    0, 0, 0,
+    RGB_R(BAR_COLOR),
+    RGB_G(BAR_COLOR),
+    RGB_B(BAR_COLOR)
+);
+
 static void draw_bars(app_state_t *state, int num_bins)
 {
+    int cols = state->main_cols - 2;
+    int rows = state->main_rows - 2;
+
+    if (cols <= 0 || rows <= 0) {
+        return;
+    }
+
+    int bins_per_bar = num_bins / cols;
+
+    if (bins_per_bar < 1) {
+        bins_per_bar = 1;
+    }
+
+    for (int x = 0; x < cols; x++) {
+        double peak = DB_MIN;
+
+        int start = x * bins_per_bar;
+        int end   = start + bins_per_bar;
+        if (end > num_bins) {
+            end = num_bins;
+        }
+
+        for (int i = start; i < end; i++) {
+            double v = state->buffer_data[i];
+            if (v > peak)
+                peak = v;
+        }
+
+        // clamp computed peak
+        if (peak < DB_MIN) peak = DB_MIN;
+        if (peak > DB_MAX) peak = DB_MAX;
+
+        // norm step
+        double norm = (peak - DB_MIN) / (DB_MAX - DB_MIN);
+
+        int bar_height = (int)(norm * rows);
+
+        ncplane_set_channels(main_win, bar_channels);
+        for (int y = 0; y < bar_height; y++) {
+            int draw_y = state->main_rows - 2 - y;
+            int draw_x = x + 1;
     
-    ncplane_set_bg_default(main_win);
+            ncplane_putstr_yx(main_win, draw_y, draw_x, " ");
+        }
+    }
 }
+
 
 void graphics_init(struct notcurses *nc, app_state_t *state) 
 {
@@ -41,6 +108,7 @@ void graphics_draw(struct notcurses *nc, app_state_t *state, size_t num_bins)
 {
     (void)nc;
 
+    ncplane_set_base(main_win, " ", 0, bg_channels);
     ncplane_erase(main_win);
 
     ncplane_double_box_sized(main_win, NCSTYLE_NONE, 0, state->main_rows, state->main_cols, 0);
