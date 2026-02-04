@@ -60,3 +60,7 @@ dkms.conf
 compile_commands.json
 
 .vscode
+
+*.log
+
+term_auviz
