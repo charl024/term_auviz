@@ -13,8 +13,9 @@
 #define RGB_G(c) (((c) >>  8) & 0xFF)
 #define RGB_B(c) (((c) >>  0) & 0xFF)
 
-#define BG_COLOR  0x232136
-#define BAR_COLOR 0xebbcba
+#define BG_COLOR    0x232136
+#define MW_BG_COLOR 0x191724
+#define BAR_COLOR   0xebbcba
 
 static struct ncplane *root;
 static struct ncplane *main_win;
@@ -24,6 +25,13 @@ static uint64_t bg_channels = NCCHANNELS_INITIALIZER(
     RGB_R(BG_COLOR),
     RGB_G(BG_COLOR),
     RGB_B(BG_COLOR)
+);
+
+static uint64_t main_win_bg_channels = NCCHANNELS_INITIALIZER(
+    0, 0, 0,
+    RGB_R(MW_BG_COLOR),
+    RGB_G(MW_BG_COLOR),
+    RGB_B(MW_BG_COLOR)
 );
 
 static uint64_t bar_channels = NCCHANNELS_INITIALIZER(
@@ -122,7 +130,6 @@ void graphics_init(struct notcurses *nc, app_state_t *state)
     state->last_term_rows = state->term_rows;
     state->last_term_cols = state->term_cols;
 
-
     struct ncplane_options opts = {
         .y = 1,
         .x = 2,
@@ -163,7 +170,9 @@ void graphics_draw(struct notcurses *nc, app_state_t *state, size_t num_bins)
     }
 
 
-    ncplane_set_base(main_win, " ", 0, bg_channels);
+    ncplane_set_base(root, " ", 0, bg_channels);
+
+    ncplane_set_base(main_win, " ", 0, main_win_bg_channels);
     ncplane_erase(main_win);
 
     ncplane_double_box_sized(main_win, NCSTYLE_NONE, 0, state->main_rows, state->main_cols, 0);
