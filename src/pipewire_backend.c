@@ -3,6 +3,65 @@
 #include "proj_defines.h"
 #include <pthread.h>
 
+#define REGISTRY_TIMEOUT_MS 2000
+
+static void on_registry_event(
+    void *data,
+    uint32_t id,
+    uint32_t permissions,
+    const char *type,
+    uint32_t version,
+    const struct spa_dict *props)
+{
+    pipewire_capture_t *capture = data;
+
+    if (strcmp(type, PW_TYPE_INTERFACE_Node) != 0)
+        return;
+
+    const char *media_class = NULL;
+    const char *media_role = NULL;
+    const char *node_name = NULL;
+
+    const struct spa_dict_item *item;
+    spa_dict_for_each(item, props) {
+        if (strcmp(item->key, PW_KEY_MEDIA_CLASS) == 0)
+            media_class = item->value;
+        else if (strcmp(item->key, PW_KEY_MEDIA_ROLE) == 0)
+            media_role = item->value;
+        else if (strcmp(item->key, PW_KEY_NODE_NAME) == 0)
+            node_name = item->value;
+    }
+
+    if (!media_class || !media_role || !node_name)
+        return;
+
+    if (strcmp(media_class, "Stream/Output/Audio") == 0 && strcmp(media_role, "Music") == 0) {
+        
+
+        if (capture->target_node[0] == '\0') {
+            
+            strncpy(capture->target_node, node_name, sizeof(capture->target_node) - 1);
+
+            // fprintf(
+            //     stderr,
+            //     "[pipewire] id=%u node=%s media.class=%s media.role=%s\n",
+            //     id,
+            //     node_name,
+            //     media_class,
+            //     media_role
+            // );
+            // fflush(stderr);
+        }
+        
+    }
+}
+
+
+static const struct pw_registry_events registry_events = {
+    PW_VERSION_REGISTRY_EVENTS,
+    .global = on_registry_event,
+};
+
 static void on_process(void *data) 
 {
     pipewire_capture_t* capture = data;
@@ -18,11 +77,23 @@ static void on_process(void *data)
         return;
     }
     
+    uint32_t stride = spa_buf->datas[0].chunk->stride;
+    uint32_t channels = stride / sizeof(float);
+    uint32_t frames = spa_buf->datas[0].chunk->size / stride;
+
     float *samples = spa_buf->datas[0].data;
-    uint32_t frames = spa_buf->datas[0].chunk->size / (sizeof(float) * 2);
 
     for (uint32_t i = 0; i < frames; i++) {
-        float mono = 0.5f * (samples[2*i] + samples[2*i + 1]);
+        float mono = 0.0f;
+        
+        for (uint32_t c = 0; c < channels; c++) {
+            mono += samples[i * channels + c];
+        }
+
+        mono /= channels;
+
+        mono *= 2.0f;
+
         ringbuffer_write(capture->ringbuffer, &mono, 1);
     }
 
@@ -52,31 +123,54 @@ void pipewire_capture_run(pipewire_capture_t* capture)
 
 pipewire_capture_t* pipewire_capture_create() 
 {
-    pipewire_capture_t* capture = malloc(sizeof(pipewire_capture_t));
+    pw_init(NULL, NULL);
+
+    pipewire_capture_t *capture = calloc(1, sizeof(*capture));
+
     if (!capture) {
         return NULL;
     }
 
-	struct pw_properties* props = pw_properties_new(
-			PW_KEY_MEDIA_TYPE, "Audio",
-			PW_KEY_MEDIA_CATEGORY, "Capture",
-			PW_KEY_MEDIA_ROLE, "Music",
-			NULL);
-
-    pw_properties_set(props, PW_KEY_STREAM_CAPTURE_SINK, "true");
-
     // initialize the capture object
     capture->loop = pw_main_loop_new(NULL);
+    capture->context = pw_context_new(pw_main_loop_get_loop(capture->loop), NULL, 0);
+    capture->core = pw_context_connect(capture->context, NULL, 0);
+    capture->registry = pw_core_get_registry(capture->core, PW_VERSION_REGISTRY, 0);
+
+    pw_registry_add_listener(
+        capture->registry,
+        &capture->registry_listener,
+        &registry_events,
+        capture);
+
+    int waited = 0;
+    while (capture->target_node[0] == '\0' && waited < REGISTRY_TIMEOUT_MS) {
+        pw_loop_iterate(pw_main_loop_get_loop(capture->loop), true);
+        waited += 50;
+    }
+
+    // if (capture->target_node[0] == '\0') {
+    //     fprintf(stderr, "Node not found after %d ms\n", REGISTRY_TIMEOUT_MS);
+    //     pipewire_capture_destroy(capture);
+    //     return NULL;
+    // }
+
+    // set props
+    struct pw_properties *props = pw_properties_new(
+        PW_KEY_MEDIA_TYPE, "Audio",
+        PW_KEY_MEDIA_CLASS, "Stream/Input/Audio",
+        PW_KEY_MEDIA_ROLE, "Music",
+        PW_KEY_TARGET_OBJECT, capture->target_node,
+        NULL);
+
     capture->stream = pw_stream_new_simple(
-			pw_main_loop_get_loop(capture->loop),
-			"native-audio_capture", 
-			props,
-			&stream_events,
-			capture);
+        pw_main_loop_get_loop(capture->loop),
+        "portable-audio-capture",
+        props,
+        &stream_events,
+        capture);
 
-    // pw_properties_free(props);
-
-	// initialize ringbuffer
+    // initialize ringbuffer
     capture->ringbuffer = ringbuffer_create(FFT_SIZE);
 
     uint8_t param_buf[1024];
@@ -90,7 +184,7 @@ pipewire_capture_t* pipewire_capture_create()
         &SPA_AUDIO_INFO_RAW_INIT(
             .format   = SPA_AUDIO_FORMAT_F32,
             .rate     = 48000,
-            .channels = 2
+            .channels = 0
         ));
 
     // connect pw stream with parameters
@@ -98,16 +192,14 @@ pipewire_capture_t* pipewire_capture_create()
         capture->stream,
         PW_DIRECTION_INPUT,
         PW_ID_ANY,
-        PW_STREAM_FLAG_AUTOCONNECT |
-        PW_STREAM_FLAG_MAP_BUFFERS |
-        PW_STREAM_FLAG_RT_PROCESS,
+        PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS,
         params, 1);
     
     // allocate thread
     capture->cap_thread = (pthread_t*)malloc(sizeof(pthread_t));
     capture->thread_running = 0;
     
-    // return the capture struct, do not start the pw loop
+    // return the capture struct
     return capture;
 }
 
@@ -135,6 +227,8 @@ void pipewire_capture_destroy(pipewire_capture_t* capture)
         pw_stream_destroy(capture->stream);
         capture->stream = NULL;
     }
+
+    spa_hook_remove(&capture->registry_listener);
 
     if (capture->loop) {
         pw_main_loop_destroy(capture->loop);

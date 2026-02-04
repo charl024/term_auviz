@@ -10,7 +10,13 @@
 typedef struct {
 	struct pw_main_loop *loop;
 	struct pw_stream *stream;
-	struct spa_pod_builder *spap_builer;
+	struct pw_context *context;
+	struct pw_core *core;
+	struct pw_registry *registry;
+	struct spa_hook registry_listener;
+
+	char target_node[250];
+
 	ringbuffer_t *ringbuffer;
 
 	int thread_running;
