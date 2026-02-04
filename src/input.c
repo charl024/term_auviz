@@ -13,11 +13,11 @@ void input_poll(struct notcurses *nc, app_state_t *state)
 
     switch (id) {
         case 'q':
-            state->running = false;
+            state->running = 0;
             break;
 
         case NCKEY_RESIZE:
-            notcurses_refresh(nc, NULL, NULL);
+            state->needs_resize = 1;
             break;
 
         default:

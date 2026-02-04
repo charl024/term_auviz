@@ -29,12 +29,7 @@ int app_run()
     // set state to running
     app_state_t state = {
         .running = 1,
-        
-        .x_pos = 5,
-        .y_pos = 5,
-        .x_vel = 60.0,
-        .y_vel = 60.0,
-
+        .needs_resize = 0,
         .buffer_size = FFT_BINS,
         .buffer_data = output_buffer
     };

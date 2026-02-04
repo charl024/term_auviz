@@ -82,11 +82,46 @@ static void draw_bars(app_state_t *state, int num_bins)
     }
 }
 
+static void graphics_resize(struct notcurses *nc, app_state_t *state)
+{
+    if (main_win) {
+        ncplane_destroy(main_win);
+        main_win = NULL;
+    }
+
+    root = notcurses_stdplane(nc);
+    ncplane_dim_yx(root, &state->term_rows, &state->term_cols);
+
+    struct ncplane_options opts = {
+        .y = 1,
+        .x = 2,
+        .rows = state->term_rows - 2,
+        .cols = state->term_cols - 4,
+    };
+
+    if (opts.rows < 3 || opts.cols < 3) {
+        return;
+    }
+
+    main_win = ncplane_create(root, &opts);
+    ncplane_dim_yx(main_win, &state->main_rows, &state->main_cols);
+
+    state->min_x = MIN_EDGE;
+    state->min_y = MIN_EDGE;
+    state->max_x = state->main_cols - MIN_EDGE;
+    state->max_y = state->main_rows - MIN_EDGE;
+}
+
+
 
 void graphics_init(struct notcurses *nc, app_state_t *state) 
 {
     root = notcurses_stdplane(nc);
     ncplane_dim_yx(root, &state->term_rows, &state->term_cols);
+
+    state->last_term_rows = state->term_rows;
+    state->last_term_cols = state->term_cols;
+
 
     struct ncplane_options opts = {
         .y = 1,
@@ -106,16 +141,33 @@ void graphics_init(struct notcurses *nc, app_state_t *state)
 
 void graphics_draw(struct notcurses *nc, app_state_t *state, size_t num_bins) 
 {
-    (void)nc;
+    int cur_rows, cur_cols;
+    ncplane_dim_yx(notcurses_stdplane(nc), &cur_rows, &cur_cols);
+
+    if (cur_rows != state->last_term_rows ||
+        cur_cols != state->last_term_cols) {
+
+        state->last_term_rows = cur_rows;
+        state->last_term_cols = cur_cols;
+        state->needs_resize = 1;
+    }
+
+    if (state->needs_resize) {
+        graphics_resize(nc, state);
+        state->needs_resize = 0;
+    }
+    
+
+    if (!main_win || state->main_rows < 3 || state->main_cols < 3) {
+        return;
+    }
+
 
     ncplane_set_base(main_win, " ", 0, bg_channels);
     ncplane_erase(main_win);
 
     ncplane_double_box_sized(main_win, NCSTYLE_NONE, 0, state->main_rows, state->main_cols, 0);
-    // ncplane_putstr_yx(main_win, (int)state->y_pos, (int)state->x_pos, "O");
     draw_bars(state, num_bins);
-
-    // ncplane_putstr_aligned(main_win, 1, NCALIGN_CENTER, "wassup");
 }
 
 void graphics_shutdown(void)
@@ -125,3 +177,4 @@ void graphics_shutdown(void)
         main_win = NULL;
     }
 }
+

@@ -9,15 +9,16 @@ typedef struct {
     int main_rows;
     int main_cols;
 
+    int last_term_rows;
+    int last_term_cols;
+
+
     int min_x;
     int min_y;
     int max_x;
     int max_y;
 
-    double x_pos;
-    double y_pos;
-    double x_vel;
-    double y_vel;
+    int needs_resize;
 
     int buffer_size;
     double* buffer_data;
