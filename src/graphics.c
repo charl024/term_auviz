@@ -5,6 +5,7 @@
 
 #include "graphics.h"
 
+#define MAX_HISTORY_BARS 512
 #define MIN_EDGE 1
 #define DB_MIN   (-80.0)
 #define DB_MAX   (0.0)
@@ -17,8 +18,16 @@
 #define MW_BG_COLOR 0x191724
 #define BAR_COLOR   0xebbcba
 
+// bar visuals
+#define ATTACK     0.7   // [0.0–1.0] How fast bars rise toward new input (higher -> faster)
+#define DECAY      0.9   // [0.0–1.0] How fast bars fall when input drops (higher -> slower fall)
+#define PEAK_MAG   0.5   // [0.0–1.0] Threshold/boost for emphasizing peaks (higher -> stronger peak emphasis)
+#define SMOOTH_ALPHA 0.2 // [0.0–1.0] Temporal smoothing factor (higher -> less smoothing, more reactive)
+
 static struct ncplane *root;
 static struct ncplane *main_win;
+static double prev_heights[MAX_HISTORY_BARS] = {0};
+
 
 static uint64_t bg_channels = NCCHANNELS_INITIALIZER(
     0, 0, 0,
@@ -46,6 +55,8 @@ static void draw_bars(app_state_t *state, int num_bins)
     int cols = state->main_cols - 2;
     int rows = state->main_rows - 2;
 
+    // fprintf(stderr, "%d\n", state->main_cols);
+
     if (cols <= 0 || rows <= 0) {
         return;
     }
@@ -57,6 +68,10 @@ static void draw_bars(app_state_t *state, int num_bins)
     }
 
     for (int x = 0; x < cols; x++) {
+        if (x >= MAX_HISTORY_BARS) {
+            break;
+        }
+
         double peak = DB_MIN;
 
         int start = x * bins_per_bar;
@@ -76,15 +91,65 @@ static void draw_bars(app_state_t *state, int num_bins)
         if (peak > DB_MAX) peak = DB_MAX;
 
         // norm step
-        double norm = (peak - DB_MIN) / (DB_MAX - DB_MIN);
+        double norm = pow((peak - DB_MIN) / (DB_MAX - DB_MIN), PEAK_MAG);
 
-        int bar_height = (int)(norm * rows);
+        double target_height = norm * rows;
 
-        ncplane_set_channels(main_win, bar_channels);
+        prev_heights[x] = (1.0 - SMOOTH_ALPHA) * prev_heights[x] + SMOOTH_ALPHA * target_height;
+
+        // if (target_height > prev_heights[x]) {
+        //     prev_heights[x] = prev_heights[x] * (1.0 - ATTACK) + target_height * ATTACK;
+        // } else {
+        //     prev_heights[x] *= DECAY;
+        // }
+
+        // int bar_height = (int)prev_heights[x];
+
+        // ncplane_set_channels(main_win, bar_channels);
+        // for (int y = 0; y < bar_height; y++) {
+        //     int draw_y = state->main_rows - 2 - y;
+        //     int draw_x = x + 1;
+    
+        //     ncplane_putstr_yx(main_win, draw_y, draw_x, " ");
+        // }
+    }
+
+    double temp[MAX_HISTORY_BARS];
+
+    for (int x = 0; x < cols; x++) {
+        temp[x] = prev_heights[x];
+    }
+
+    // box filter
+    // for (int x = 1; x < cols - 1; x++) {
+    //     prev_heights[x] = (temp[x - 1] + temp[x] + temp[x + 1]) / 3.0;
+    // }
+
+    // double weights[5] = {0.061, 0.244, 0.387, 0.244, 0.061};
+
+    // for (int x = 2; x < cols - 2; x++) {
+    //     int val = weights[0] * temp[x - 2] + weights[1] * temp[x - 1] + weights[2] * temp[x];
+    //     int val2 = weights[3] * temp[x + 1] + weights[4] * temp[x + 2];
+    //     prev_heights[x] = val + val2;
+    // }
+
+    double weights[5] = {0.244, 0.387, 0.244};
+
+    for (int x = 1; x < cols - 1; x++) {
+        int val = weights[0] * temp[x - 1] + weights[1] * temp[x] + weights[2] * temp[x + 1];
+        prev_heights[x] = val;
+    }
+
+    ncplane_set_channels(main_win, bar_channels);
+
+    for (int x = 0; x < cols && x < MAX_HISTORY_BARS; x++) {
+
+        int bar_height = (int)prev_heights[x];
+
         for (int y = 0; y < bar_height; y++) {
             int draw_y = state->main_rows - 2 - y;
             int draw_x = x + 1;
-    
+
             ncplane_putstr_yx(main_win, draw_y, draw_x, " ");
         }
     }
