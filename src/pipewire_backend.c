@@ -21,6 +21,7 @@ static void on_registry_event(
     const char *media_class = NULL;
     const char *media_role = NULL;
     const char *node_name = NULL;
+	const char *app_name = NULL;
 
     const struct spa_dict_item *item;
     spa_dict_for_each(item, props) {
@@ -30,27 +31,43 @@ static void on_registry_event(
             media_role = item->value;
         else if (strcmp(item->key, PW_KEY_NODE_NAME) == 0)
             node_name = item->value;
+		else if (strcmp(item->key, PW_KEY_APP_NAME) == 0)
+    		app_name = item->value;
     }
 
-    if (!media_class || !media_role || !node_name)
+    if (!media_class || !node_name)
         return;
 
-    if (strcmp(media_class, "Stream/Output/Audio") == 0 && strcmp(media_role, "Music") == 0) {
-        
+    if (strcmp(media_class, "Stream/Output/Audio") == 0) {
+
+		if (!node_name || node_name[0] == '\0') {
+			fprintf(stderr, "East\n");
+		    return;
+		}
+
+		if (strstr(node_name, "dummy")) {
+			fprintf(stderr, "North\n");
+    		return;
+		}
+
+		if (strstr(node_name, "speech")) {
+			fprintf(stderr, "South\n");
+		    return;
+		}
 
         if (capture->target_node[0] == '\0') {
-            
+
             strncpy(capture->target_node, node_name, sizeof(capture->target_node) - 1);
 
-            // fprintf(
-            //     stderr,
-            //     "[pipewire] id=%u node=%s media.class=%s media.role=%s\n",
-            //     id,
-            //     node_name,
-            //     media_class,
-            //     media_role
-            // );
-            // fflush(stderr);
+            fprintf(
+                 stderr,
+                 "[pipewire] id=%u node=%s media.class=%s media.role=%s\n",
+                 id,
+                 node_name,
+                 media_class,
+                 media_role
+             );
+             fflush(stderr);
         }
         
     }
